@@ -7,10 +7,16 @@ import {
 import HomePresenter from './home-presenter';
 import Map from '../../utils/map';
 import * as StoryAPI from '../../data/api';
+import { StoryDatabase } from '../../utils/database';
 
 export default class HomePage {
   #presenter = null;
   #map = null;
+  #db = null; // Add database instance
+
+  constructor() {
+    this.#db = new StoryDatabase(); // Initialize database
+  }
 
   async render() {
     return `
@@ -39,57 +45,79 @@ export default class HomePage {
     });
 
     await this.#presenter.initialGalleryAndMap();
+    this.#setupSaveButtons();
   }
 
-  populateReportsList(message, reports) {
-  // Pastikan reports adalah array sebelum diproses
-  if (!Array.isArray(reports)) {
-    console.error('Reports is not an array:', reports);
-    this.populateReportsListError('Format data tidak valid');
-    return;
-  }
+  async populateReportsList(message, reports) {
+    if (!Array.isArray(reports)) {
+      console.error('Reports is not an array:', reports);
+      this.populateReportsListError('Format data tidak valid');
+      return;
+    }
 
-  if (reports.length <= 0) {
-    this.populateReportsListEmpty();
-    return;
-  }
+    if (reports.length <= 0) {
+      this.populateReportsListEmpty();
+      return;
+    }
 
-  try {
-    const html = reports.reduce((accumulator, report) => {
-      // Tambahkan validasi untuk setiap report
-      if (!report || typeof report !== 'object') {
-        return accumulator;
-      }
+    try {
+      // Create HTML for all reports
+      let html = '';
+      for (const report of reports) {
+        const isSaved = await this.#db.isStorySaved(report.id);
+        
+        // Add marker to map if coordinates exist
+        if (this.#map && report.lat && report.lon) {
+          const coordinate = [report.lat, report.lon];
+          const markerOptions = { alt: report.description || 'Laporan' };
+          const popupOptions = { content: report.description || 'Laporan tanpa deskripsi' };
+          this.#map.addMarker(coordinate, markerOptions, popupOptions);
+        }
 
-      // Tambahkan marker ke peta jika ada koordinat
-      if (this.#map && report.lat && report.lon) {
-        const coordinate = [report.lat, report.lon];
-        const markerOptions = { alt: report.description || 'Laporan' };
-        const popupOptions = { content: report.description || 'Laporan tanpa deskripsi' };
-        this.#map.addMarker(coordinate, markerOptions, popupOptions);
-      }
-
-      return accumulator.concat(
-        generateReportItemTemplate({
+        html += generateReportItemTemplate({
           id: report.id || 'unknown',
           description: report.description || 'Tidak ada deskripsi',
           photo: report.photoUrl || report.photo || '',
           name: report.name || 'Anonim',
           createdAt: report.createdAt || new Date().toISOString(),
           lat: report.lat,
-          lon: report.lon
-        })
-      );
-    }, '');
+          lon: report.lon,
+          isSaved
+        });
+      }
 
-    document.getElementById('reports-list').innerHTML = `
-      <div class="reports-list">${html}</div>
-    `;
-  } catch (error) {
-    console.error('Error processing reports:', error);
-    this.populateReportsListError('Gagal memproses data laporan');
+        document.getElementById('reports-list').innerHTML = `
+        <div class="reports-list">${html}</div>
+      `;
+    } catch (error) {
+      console.error('Error processing reports:', error);
+      this.populateReportsListError('Gagal memproses data laporan');
+    }
   }
-}
+
+  #setupSaveButtons() {
+    document.getElementById('reports-list').addEventListener('click', async (event) => {
+      if (event.target.closest('.save-button')) {
+        const button = event.target.closest('.save-button');
+        const storyId = button.dataset.id;
+        
+        try {
+          if (button.classList.contains('saved')) {
+            await this.#presenter.removeSavedStory(storyId);
+            button.classList.remove('saved');
+            button.innerHTML = '<i class="fas fa-bookmark-o"></i> Simpan';
+          } else {
+            await this.#presenter.saveStoryToSaved(storyId);
+            button.classList.add('saved');
+            button.innerHTML = '<i class="fas fa-bookmark"></i> Tersimpan';
+          }
+        } catch (error) {
+          console.error('Error toggling save:', error);
+          alert('Gagal menyimpan cerita: ' + error.message);
+        }
+      }
+    });
+  }
 
   
 

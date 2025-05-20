@@ -23,6 +23,7 @@ export function generateAuthenticatedNavigationListTemplate() {
   return `
     <li><a id="report-list-button" class="report-list-button" href="#/">Daftar Cerita</a></li>
     <li><a id="report-list-button" class="report-list-button" href="#/new">Buat Cerita<i class="fas fa-plus"></i></a></li>
+    <li><a id="report-list-button" class="report-list-button" href="#/saved"><i class="fas fa-bookmark"></i> Tersimpan</a></li>
     <li><a id="logout-button" class="logout-button" href="#/logout"><i class="fas fa-sign-out-alt"></i> Logout</a></li>
   `;
 }
@@ -53,6 +54,7 @@ export function generateReportItemTemplate({
   createdAt,
   lat,
   lon,
+  isSaved = false
 }) {
   // Format lokasi jika ada koordinat
   const locationText = (lat && lon) ? 
@@ -74,6 +76,12 @@ export function generateReportItemTemplate({
       `}
       <div class="report-item__body">
         
+        <div class="report-item__actions">
+          <button class="save-button ${isSaved ? 'saved' : ''}" data-id="${id}">
+            <i class="fas ${isSaved ? 'fa-bookmark' : 'fa-bookmark-o'}"></i>
+            ${isSaved ? 'Tersimpan' : 'Simpan'}
+          </button>
+        </div>
         <div id="report-description" class="report-item__description">
           <h5>${description}</h5>
         </div>
@@ -116,6 +124,59 @@ export function generateNotificationTemplate(type, message) {
       <button class="notification-close">
         <i class="fas fa-times"></i>
       </button>
+    </div>
+  `;
+}
+
+export function generateSaveButtonTemplate(isSaved) {
+  return `
+    <button class="save-button ${isSaved ? 'saved' : ''}" aria-label="${isSaved ? 'Hapus dari tersimpan' : 'Simpan cerita'}">
+      <i class="fas ${isSaved ? 'fa-bookmark' : 'fa-bookmark-o'}"></i>
+    </button>
+  `;
+}
+
+export function generateSavedReportItemTemplate({
+  id,
+  description,
+  photo,
+  name,
+  createdAt,
+  lat,
+  lon,
+}) {
+  return `
+    <div tabindex="0" class="report-item saved-report-item" data-reportid="${id}">
+      ${photo ? `
+        <img class="report-item__image" src="${photo}" alt="${description.substring(0, 50)}">
+      ` : `
+        <div class="report-item__image-placeholder">
+          <i class="fas fa-image"></i>
+          <span>Tidak ada gambar</span>
+        </div>
+      `}
+      <div class="report-item__body">
+        <div class="report-item__header">
+          <button class="remove-saved-button" data-id="${id}" aria-label="Hapus dari tersimpan">
+            <i class="fas fa-trash"></i>
+          </button>
+        </div>
+        <div id="report-description" class="report-item__description">
+          <h5>${description}</h5>
+        </div>
+        <div class="report-item__more-info">
+          <div class="report-item__author">
+            <i class="fas fa-user"></i> ${name || 'Anonim'}
+          </div>
+        </div>
+        <div class="report-item__main">
+          <div class="report-item__more-info">
+            <div class="report-item__createdat">
+              <i class="fas fa-calendar-alt"></i> Upload at <strong>${showFormattedDate(createdAt, 'id-ID')}</strong> 
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   `;
 }

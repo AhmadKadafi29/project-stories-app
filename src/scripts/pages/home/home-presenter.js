@@ -1,16 +1,14 @@
-// dibuat cek database nya sudah jalan atau belum, kalo udah jalan dihapus saja
-// start
 import { StoryDatabase } from '../../utils/database';
-const db = new StoryDatabase();
-console.log(db);
-// end
+
 export default class HomePresenter {
   #view;
   #model;
+  #db;
 
   constructor({ view, model }) {
     this.#view = view;
     this.#model = model;
+    this.#db = new StoryDatabase();
   }
 
   async showReportsListMap() {
@@ -19,6 +17,7 @@ export default class HomePresenter {
       await this.#view.initialMap();
     } catch (error) {
       console.error('showReportsListMap: error:', error);
+      throw error;
     } finally {
       this.#view.hideMapLoading();
     }
@@ -28,27 +27,26 @@ export default class HomePresenter {
     this.#view.showLoading();
     try {
       await this.showReportsListMap();
-  
+      
       let stories = [];
-      const db = new StoryDatabase();
       
       try {
-        // Coba ambil data dari API
+        // Try to get data from API first
         const response = await this.#model.getAllReports();
         
         if (response.ok) {
           stories = response.data;
-          // Simpan ke IndexedDB
-          await Promise.all(stories.map(story => db.saveStory(story)));
+          // Save to IndexedDB
+          await Promise.all(stories.map(story => this.#db.saveStory(story)));
         } else {
-          // Fallback ke IndexedDB jika API error
-          stories = await db.getStories();
+          // Fallback to IndexedDB if API fails
+          stories = await this.#db.getStories();
         }
       } catch (error) {
         console.error('API Error:', error);
-        stories = await db.getStories();
+        stories = await this.#db.getStories();
       }
-  
+
       if (stories.length > 0) {
         this.#view.populateReportsList(stories.length ? 'Daftar Cerita' : 'Tidak ada cerita', stories);
       } else {
@@ -62,7 +60,8 @@ export default class HomePresenter {
     }
   }
 
-  async postNewReport({description, photo, lat, lon }) {
+
+  async postNewReport({ description, photo, lat, lon }) {
     this.#view.showSubmitLoadingButton();
     try {
       const response = await this.#model.storeNewReport({
@@ -78,9 +77,12 @@ export default class HomePresenter {
         return;
       }
   
-      // Kirim notifikasi setelah berhasil
+      // Send notification after success
       await this.#sendNotification(description);
       this.#view.storeSuccessfully(response.message);
+      
+      // Refresh the stories list
+      await this.initialGalleryAndMap();
     } catch (error) {
       console.error('postNewReport: error:', error);
       this.#view.storeFailed(error.message || 'Gagal mengirim cerita');
@@ -89,25 +91,104 @@ export default class HomePresenter {
     }
   }
 
+  async saveStory(reportId) {
+    try {
+      const stories = await this.#db.getStories();
+      const storyToSave = stories.find(story => story.id === reportId);
+      
+      if (storyToSave) {
+        await this.#db.saveStoryToSaved(storyToSave);
+        await this.#sendNotification(
+          `Cerita "${storyToSave.description.substring(0, 30)}..." telah disimpan`
+        );
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('Error saving story:', error);
+      throw error;
+    }
+  }
+
+  async removeSavedStory(reportId) {
+    try {
+      await this.#db.removeSavedStory(reportId);
+      return true;
+    } catch (error) {
+      console.error('Error removing saved story:', error);
+      throw error;
+    }
+  }
+
+  async isStorySaved(reportId) {
+    try {
+      return await this.#db.isStorySaved(reportId);
+    } catch (error) {
+      console.error('Error checking saved story:', error);
+      return false;
+    }
+  }
+
   async #sendNotification(description) {
     try {
-      // Cek service worker dan izin notifikasi
+      // Check service worker and notification permission
       if (!('serviceWorker' in navigator)) return;
       const permission = await Notification.requestPermission();
       if (permission !== 'granted') return;
 
-      // Daftarkan service worker
+      // Register service worker
       const registration = await navigator.serviceWorker.register('/sw.js');
       
-      // Kirim notifikasi
+      // Send notification
       registration.showNotification('Story berhasil dibuat', {
-        body: `Anda telah membuat story baru dengan deskripsi: ${description.substring(0, 50)}${description.length > 50 ? '...' : ''}`,
+        body: `Anda telah membuat story baru: ${description.substring(0, 50)}${description.length > 50 ? '...' : ''}`,
         icon: '/icons/icon-192x192.png',
-        vibrate: [200, 100, 200]
+        vibrate: [200, 100, 200],
+        badge: '/icons/badge.png'
       });
 
     } catch (error) {
       console.error('Gagal mengirim notifikasi:', error);
+    }
+  }
+
+  // New method to handle story details
+  async saveStoryToSaved(storyId) {
+    try {
+      const db = new StoryDatabase();
+      
+      // Coba dapatkan cerita dari database lokal terlebih dahulu
+      const localStories = await db.getStories();
+      const story = localStories.find(s => s.id === storyId);
+      
+      if (story) {
+        await db.saveStoryToSaved(story);
+        return;
+      }
+      
+      // Jika tidak ada di lokal, coba dari API (jika ada method getReportById)
+      if (this.#model.getReportById) {
+        const response = await this.#model.getReportById(storyId);
+        if (response.ok) {
+          await db.saveStoryToSaved(response.data);
+          return;
+        }
+      }
+      
+      throw new Error('Cerita tidak ditemukan');
+    } catch (error) {
+      console.error('Error saving story:', error);
+      throw error;
+    }
+  }
+
+  async removeSavedStory(storyId) {
+    try {
+      const db = new StoryDatabase();
+      await db.removeSavedStory(storyId);
+    } catch (error) {
+      console.error('Error removing saved story:', error);
+      throw error;
     }
   }
 }

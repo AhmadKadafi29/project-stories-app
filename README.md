@@ -183,3 +183,6 @@ Tambahkan di style.css
   font-size: 16px;
 }
 ```
+
+direktori docs rename dari direktori dist
+dist akan muncul saat menjalankan npm run build
