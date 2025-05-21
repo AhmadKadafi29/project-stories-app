@@ -429,6 +429,59 @@ header {
   font-size: 16px;
 }
 
+.save-button {
+  background: #f8f9fa;
+  border: 1px solid #ddd;
+  padding: 5px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.3s;
+}
+
+.save-button:hover {
+  background: #e9ecef;
+}
+
+.save-button.saved {
+  background: #4CAF50;
+  color: white;
+  border-color: #4CAF50;
+}
+
+/* Saved stories page styles */
+.saved-story-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  margin-bottom: 15px;
+  background: white;
+}
+
+.saved-story-item img {
+  width: 100px;
+  height: 100px;
+  object-fit: cover;
+  border-radius: 4px;
+}
+
+.delete-saved-button {
+  background: #ff4444;
+  color: white;
+  border: none;
+  padding: 5px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  margin-top: 10px;
+}
+
+.delete-saved-button:hover {
+  background: #cc0000;
+}
+
 .logout-button {
   background-color: transparent;
   border-radius: 4px;

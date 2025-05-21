@@ -17,6 +17,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
   await app.renderPage();
 
+  
+
   window.addEventListener('hashchange', async () => {
     await app.renderPage();
 
